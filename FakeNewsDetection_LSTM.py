@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import tensorflow as tf
 import nltk
 import gensim
 import wordcloud
@@ -21,6 +20,10 @@ true_news.info()
 #checking the null values in the dataset(not required as we can see from info())
 fake_news.isnull().sum()
 true_news.isnull().sum()
+#deleting rows to reduce the size (may be needed for quick test as full dataset training may take long time)
+#fake_news.drop(fake_news.index[500:], inplace=True)
+#true_news.drop(true_news.index[500:], inplace=True)
+
 #adding lebel to the dataset isTrue =1 for true and 0 for fake
 fake_news["isTrue"]=0
 true_news["isTrue"]=1
@@ -88,7 +91,17 @@ plt.hist(x=[nltk.word_tokenize(doc) for doc in dataset.required_join],bins=100)
 plt.show()
 #Spliiting the dataset into train and testset
 from sklearn.model_selection import train_test_split
-X_train,X_test,y_train,y_test = train_test_split(dataset.required_join,dataset.isTrue,test_size=0.2)
+X_train,X_test,y_train,y_test = train_test_split(dataset.required_join,dataset.isTrue,test_size=0.2)#Creating validation set  by copying last 10 elements from the training set
+#Creating validation set
+X_val = X_train[30000:]
+y_val = y_train[30000:]
+#Removing the validation set from training set
+X_train = X_train[:30000]
+y_train = y_train[:30000]
+#plotting the number of true news and fake news in traing, test and validation set
+plt.hist(y_train)
+plt.hist(y_test)
+plt.hist(y_val)
 #Word Embedding (Mapping word to vectors of real numbers)
 #Crating training sequences and test sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -96,12 +109,14 @@ tokenizer = Tokenizer(num_words=unique_words)
 tokenizer.fit_on_texts(X_train)
 train_sequences = tokenizer.texts_to_sequences(X_train)
 test_sequences = tokenizer.texts_to_sequences(X_test)
+val_sequences = tokenizer.texts_to_sequences(X_val)
 print("The embedding for document: ",dataset.required_join[0], 
       "\n is: ",tokenizer.texts_to_sequences(dataset.required_join[0]) ) #this is how train and test sequences created
 #padding the sequnces (adding 0 to the end ) to make each sequence length exactly equal to maxLen
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 train_sequences_pad = pad_sequences(train_sequences, maxlen=maxLen, padding='post', truncating = 'post')
 test_sequences_pad = pad_sequences(test_sequences, maxlen=maxLen, padding= 'post', truncating = 'post')
+val_sequences_pad = pad_sequences(val_sequences, maxlen=maxLen, padding= 'post', truncating = 'post' )
 #printing past three values to check padding whether the padding has been done correclty or not
 for i,doc in enumerate(train_sequences_pad[:3]):
     print("The padded incoding for document ",i+1, " is: ",doc)
@@ -117,4 +132,44 @@ model.add(Dense(1, activation='sigmoid'))
 
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
 y_train = np.asarray(y_train)
-model.fit(train_sequences_pad,y_train, validation_split=0.1,epochs=2)
+y_val = np.asarray(y_val)
+training=model.fit(train_sequences_pad,y_train,validation_data=(val_sequences_pad,y_val),batch_size=32, epochs=3)
+
+#Visulaizing the Training and Validation Sets Loss and Accuracy
+fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8,4))
+#Plot training and validation accuracy values
+#axes[0].set_ylim(0,1) #if we want to limit axis in certain range
+axes[0].plot(training.history['acc'], label='Train')
+axes[0].plot(training.history['val_acc'], label='Validation')
+axes[0].set_title('Model Accuracy')
+axes[0].set_xlabel('Epoch')
+axes[0].set_ylabel('Accuracy')
+axes[0].legend()
+#Plot training and validation loss values
+#axes[1].set_ylim(0,1)
+axes[1].plot(training.history['loss'], label='Train')
+axes[1].plot(training.history['val_loss'], label='Validation')
+axes[1].set_title('Model Loss')
+axes[1].set_xlabel('Epoch')
+axes[1].set_ylabel('Loss')
+axes[1].legend()
+plt.tight_layout()
+plt.show()
+
+#performance evaluatoin
+y_pred = model.predict(test_sequences_pad)
+prediction = []
+for i in range(len(y_pred)):
+    if(y_pred[i].item()>0.5):
+        prediction.append(1)
+    else:
+        prediction.append(0)
+# Generating confusion matrics, details classification report
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+cm = confusion_matrix(list(y_test),prediction)
+print("Confusion Matrix for Neural Network Model:\n ",cm)
+print( "{0}".format(classification_report(list(y_test),prediction)))
+# Generating accuracy in %, 
+# Similary precision_score and recall_score can be used to generate precision and recall seperately
+accuracy_test = accuracy_score(list(y_test),prediction)*100
+print('Accuracy:%.2f' % accuracy_test,"%")

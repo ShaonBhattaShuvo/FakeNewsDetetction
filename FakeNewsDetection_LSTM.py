@@ -55,7 +55,8 @@ for row in dataset.required:
         total_words.append(word)
 len(total_words)
 #lenght of unique words
-print(len(set(total_words)))
+unique_words=len(set(total_words))
+print(unique_words)
 #joining the words to create paragraphs
 dataset['required_join'] = dataset['required'].apply(lambda word : " ".join(word))
 print(dataset['required_join'][0])
@@ -65,12 +66,32 @@ sns.countplot(y='subject',data=dataset)
 #plotting barchart of number of true news and fake news
 sns.countplot(y='isTrue',data=dataset)
 #plotting wordcloud for true news
-plt.figure(figsize=(10,8))
+plt.figure(figsize=(12,8))
 wc =  wordcloud.WordCloud(width=500, height=200,max_words=1000,
                           stopwords=stopWords).generate(" ".join(dataset[dataset.isTrue==1].required_join))
 plt.imshow(wc,interpolation='bilinear')
 #plotting wordcloud for fake news
-plt.figure(figsize=(10,8))
+plt.figure(figsize=(12,8))
 wc =  wordcloud.WordCloud(width=500, height=200,max_words=1000,
                           stopwords=stopWords).generate(" ".join(dataset[dataset.isTrue==1].required_join))
 plt.imshow(wc,interpolation='bilinear')
+#counting maximum number of token size amoung all the documents
+nltk.download('punkt')
+maxLen = -1
+for row in dataset.required_join:
+    token = nltk.word_tokenize(row)
+    if(len(token)>maxLen):
+        maxLen=len(token)
+print("Maximum number of words in a single doucment is: ",maxLen)
+#Spliiting the dataset into train and testset
+from sklearn.model_selection import train_test_split
+X_train,X_test,y_train,y_test = train_test_split(dataset.required_join,dataset.isTrue,test_size=0.2)
+#Word Embedding
+#Crating training sequences and test sequences
+from tensorflow.keras.preprocessing.text import Tokenizer
+tokenizer = Tokenizer(num_words=unique_words)
+tokenizer.fit_on_texts(X_train)
+train_sequences = tokenizer.texts_to_sequences(X_train)
+test_sequences = tokenizer.texts_to_sequences(X_test)
+print("The embedding for document: ",dataset.required_join[0], 
+      "\n is: ",tokenizer.texts_to_sequences(dataset.required_join[0]) ) #this is how train and test sequences created

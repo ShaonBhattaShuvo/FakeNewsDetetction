@@ -48,11 +48,29 @@ def preprocessing(text):
 #creating a required column which contains required words after preprocessing the dataset 
 dataset['required'] = dataset['title_text'].apply(preprocessing)
 print(dataset['required'][0])
-
-
-
-
-
-
-
-
+#cheking the total number of words in the dataset
+total_words = []
+for row in dataset.required:
+    for word in row:
+        total_words.append(word)
+len(total_words)
+#lenght of unique words
+print(len(set(total_words)))
+#joining the words to create paragraphs
+dataset['required_join'] = dataset['required'].apply(lambda word : " ".join(word))
+print(dataset['required_join'][0])
+#plotting barchart of number of news in each category
+plt.figure(figsize=(8,5))
+sns.countplot(y='subject',data=dataset)
+#plotting barchart of number of true news and fake news
+sns.countplot(y='isTrue',data=dataset)
+#plotting wordcloud for true news
+plt.figure(figsize=(10,8))
+wc =  wordcloud.WordCloud(width=500, height=200,max_words=1000,
+                          stopwords=stopWords).generate(" ".join(dataset[dataset.isTrue==1].required_join))
+plt.imshow(wc,interpolation='bilinear')
+#plotting wordcloud for fake news
+plt.figure(figsize=(10,8))
+wc =  wordcloud.WordCloud(width=500, height=200,max_words=1000,
+                          stopwords=stopWords).generate(" ".join(dataset[dataset.isTrue==1].required_join))
+plt.imshow(wc,interpolation='bilinear')

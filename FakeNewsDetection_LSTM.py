@@ -83,10 +83,13 @@ for row in dataset.required_join:
     if(len(token)>maxLen):
         maxLen=len(token)
 print("Maximum number of words in a single doucment is: ",maxLen)
+#Plotting the histogram for length of each doucment
+plt.hist(x=[nltk.word_tokenize(doc) for doc in dataset.required_join],bins=100)
+plt.show()
 #Spliiting the dataset into train and testset
 from sklearn.model_selection import train_test_split
 X_train,X_test,y_train,y_test = train_test_split(dataset.required_join,dataset.isTrue,test_size=0.2)
-#Word Embedding
+#Word Embedding (Mapping word to vectors of real numbers)
 #Crating training sequences and test sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 tokenizer = Tokenizer(num_words=unique_words)
@@ -95,3 +98,23 @@ train_sequences = tokenizer.texts_to_sequences(X_train)
 test_sequences = tokenizer.texts_to_sequences(X_test)
 print("The embedding for document: ",dataset.required_join[0], 
       "\n is: ",tokenizer.texts_to_sequences(dataset.required_join[0]) ) #this is how train and test sequences created
+#padding the sequnces (adding 0 to the end ) to make each sequence length exactly equal to maxLen
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+train_sequences_pad = pad_sequences(train_sequences, maxlen=maxLen, padding='post', truncating = 'post')
+test_sequences_pad = pad_sequences(test_sequences, maxlen=maxLen, padding= 'post', truncating = 'post')
+#printing past three values to check padding whether the padding has been done correclty or not
+for i,doc in enumerate(train_sequences_pad[:3]):
+    print("The padded incoding for document ",i+1, " is: ",doc)
+
+#Creating LSTM model
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dense
+model = Sequential()
+model.add(Embedding(unique_words, output_dim=128))
+model.add(Bidirectional(LSTM(128)))
+model.add(Dense(128, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
+y_train = np.asarray(y_train)
+model.fit(train_sequences_pad,y_train, validation_split=0.1,epochs=2)
